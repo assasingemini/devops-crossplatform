@@ -8,7 +8,6 @@ env:
 phases:
   pre_build:
     commands:
-      - '$ErrorActionPreference = "Stop"'
       - 'Write-Host "=== PRE_BUILD: Resolve AWS context ==="'
       - '$ACCOUNT_ID = (aws sts get-caller-identity --query Account --output text)'
       - '$REGION = if ($env:ECR_REGION) { $env:ECR_REGION } else { $env:AWS_DEFAULT_REGION }'
