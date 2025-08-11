@@ -22,17 +22,21 @@ phases:
           aws ecr create-repository --repository-name $env:IMAGE_REPO_NAME --region $REGION | Out-Null
           if ($LASTEXITCODE -ne 0) { throw "Failed to create ECR repo $($env:IMAGE_REPO_NAME) in $REGION" }
         }
+
       - 'Write-Host "Login ECR..."'
       - 'docker logout $ECR_URI | Out-Null'
-      # Login kiểu mới (CLI v2) + scope theo registry; nếu fail thì fallback
-      - '$pw = aws ecr get-login-password --region $REGION --registry-ids $ACCOUNT_ID'
+
+      # Cách mới (CLI v2): KHÔNG có --registry-ids
+      - '$pw = aws ecr get-login-password --region $REGION'
       - 'if ($pw) { $pw | docker login --username AWS --password-stdin $ECR_URI }'
+
+      # Fallback nếu trên lỗi (ví dụ 400 Bad Request): dùng get-authorization-token + registry-ids
       - 'if ($LASTEXITCODE -ne 0) {'
-      - '  Write-Host "New login method failed -> fallback to get-authorization-token"'
+      - '  Write-Host "New login failed -> fallback to get-authorization-token"'
       - '  $auth = aws ecr get-authorization-token --region $REGION --registry-ids $ACCOUNT_ID --output text --query "authorizationData[].authorizationToken"'
       - '  $proxy = aws ecr get-authorization-token --region $REGION --registry-ids $ACCOUNT_ID --output text --query "authorizationData[].proxyEndpoint"'
       - '  $proxy = $proxy -replace "^https://",""'
-      - '  $decoded = [System.Text.Encoding]::ASCII.GetString([System.Convert]::FromBase64String($auth))'
+      - '  $decoded = [System.Text.Encoding]::ASCII.GetString([System.Convert]::FromBase64String($auth))'  # "AWS:<password>"
       - '  $parts = $decoded.Split(":",2)'
       - '  $user = $parts[0]; $pass = $parts[1]'
       - '  $pass | docker login --username $user --password-stdin $proxy'
