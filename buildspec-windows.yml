@@ -14,44 +14,37 @@ phases:
       - '$ECR_URI = "$ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com"'
       - 'Write-Host "Account=$ACCOUNT_ID  Region=$REGION"'
       - 'Write-Host "Registry=$ECR_URI  Repo=$env:IMAGE_REPO_NAME"'
-
       - 'Write-Host "Ensure Docker service running..."'
       - '$svc = Get-Service -Name docker -ErrorAction SilentlyContinue; if (-not $svc) { throw "Docker service not installed. In CodeBuild set Running mode = Instance (not Container)." }'
       - 'if ($svc.Status -ne "Running") { Start-Service docker; Start-Sleep -Seconds 5 }'
       - 'docker version'
       - 'docker info | findstr OSType'
-
       - 'Write-Host "Warm-up: pull base image ltsc2022"'
       - 'docker pull mcr.microsoft.com/windows/servercore:ltsc2022'
-
       - 'Write-Host "Ensure ECR repository exists..."'
       - 'aws ecr describe-repositories --repository-names $env:IMAGE_REPO_NAME --region $REGION | Out-Null'
       - 'if ($LASTEXITCODE -ne 0) { Write-Host "Repo not found. Creating..."; aws ecr create-repository --repository-name $env:IMAGE_REPO_NAME --region $REGION | Out-Null; if ($LASTEXITCODE -ne 0) { throw "Failed to create ECR repo $($env:IMAGE_REPO_NAME) in $REGION" } }'
-
       - 'Write-Host "Login ECR..."'
       - '$pw = aws ecr get-login-password --region $REGION'
       - 'if ($pw) { $pw | docker login --username AWS --password-stdin $ECR_URI }'
-
-      # >>> Fallback gộp thành 1 command để không lỗi thiếu "}"
       - |-
         if ($LASTEXITCODE -ne 0) {
           Write-Host "New login failed -> fallback to get-authorization-token"
           $auth  = aws ecr get-authorization-token --region $REGION --registry-ids $ACCOUNT_ID --output text --query "authorizationData[].authorizationToken"
           $proxy = aws ecr get-authorization-token --region $REGION --registry-ids $ACCOUNT_ID --output text --query "authorizationData[].proxyEndpoint"
           $proxy = $proxy -replace "^https://",""
-          $decoded = [System.Text.Encoding]::ASCII.GetString([System.Convert]::FromBase64String($auth))  # "AWS:<password>"
+          $decoded = [System.Text.Encoding]::ASCII.GetString([System.Convert]::FromBase64String($auth))
           $user,$pass = $decoded.Split(":",2)
           $pass | docker login --username $user --password-stdin $proxy
         }
-
       - 'if ($LASTEXITCODE -ne 0) { throw "ECR login failed (both methods)" }'
 
   build:
     commands:
       - 'Write-Host "=== BUILD: Docker build & tag ==="'
-      - 'docker build -f Dockerfile.windows -t $env:IMAGE_REPO_NAME:latest .'
-      - 'docker tag $env:IMAGE_REPO_NAME:latest "$ECR_URI/$($env:IMAGE_REPO_NAME):latest"'
-      - 'docker tag $env:IMAGE_REPO_NAME:latest "$ECR_URI/$($env:IMAGE_REPO_NAME):$env:CODEBUILD_RESOLVED_SOURCE_VERSION"'
+      - 'docker build -f Dockerfile.windows -t "$($env:IMAGE_REPO_NAME):latest" .'
+      - 'docker tag "$($env:IMAGE_REPO_NAME):latest" "$ECR_URI/$($env:IMAGE_REPO_NAME):latest"'
+      - 'docker tag "$($env:IMAGE_REPO_NAME):latest" "$ECR_URI/$($env:IMAGE_REPO_NAME):$env:CODEBUILD_RESOLVED_SOURCE_VERSION"'
 
   post_build:
     commands:
