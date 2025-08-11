@@ -8,19 +8,16 @@ env:
 phases:
   pre_build:
     commands:
+      - '$ErrorActionPreference = "Stop"'
       - 'Write-Host "=== PRE_BUILD: Resolve AWS context ==="'
       - '$ACCOUNT_ID = (aws sts get-caller-identity --query Account --output text)'
       - '$REGION = if ($env:ECR_REGION) { $env:ECR_REGION } else { $env:AWS_DEFAULT_REGION }'
       - '$ECR_URI = "$ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com"'
       - 'Write-Host "Account=$ACCOUNT_ID  Region=$REGION"'
       - 'Write-Host "Registry=$ECR_URI  Repo=$env:IMAGE_REPO_NAME"'
-      - |-
-        Write-Host "Ensure ECR repository exists..."
-        try {
-          aws ecr describe-repositories --repository-names $env:IMAGE_REPO_NAME --region $REGION | Out-Null
-        } catch {
-          aws ecr create-repository --repository-name $env:IMAGE_REPO_NAME --region $REGION | Out-Null
-        }
+      - 'Write-Host "Ensure ECR repository exists..."'
+      - '$null = aws ecr describe-repositories --repository-names $env:IMAGE_REPO_NAME --region $REGION 2>$null'
+      - 'if ($LASTEXITCODE -ne 0) { Write-Host "Repo not found. Creating..."; $null = aws ecr create-repository --repository-name $env:IMAGE_REPO_NAME --region $REGION }'
       - 'Write-Host "Login ECR..."'
       - 'docker logout $ECR_URI | Out-Null'
       - '$pw = aws ecr get-login-password --region $REGION'
