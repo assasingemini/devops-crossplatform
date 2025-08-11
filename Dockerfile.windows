@@ -1,16 +1,16 @@
 # escape=`
-FROM mcr.microsoft.com/windows/servercore:ltsc2019
+FROM mcr.microsoft.com/windows/servercore:ltsc2022
 
 SHELL ["powershell","-NoLogo","-NonInteractive","-Command"]
 WORKDIR C:\app
 
-# Copy ứng dụng
+# copy app
 COPY main.ps1 C:\app\main.ps1
 
-# Cho phép bind http://+:8080/ khi không chạy quyền admin
+# cho phép bind http://+:8080/ khi không chạy admin
 RUN netsh http add urlacl url=http://+:8080/ user=Everyone
 
 EXPOSE 8080
 
-# Khởi chạy script (bypass execution policy để tránh bị chặn)
+# chạy script (bypass execution policy)
 ENTRYPOINT ["powershell.exe","-ExecutionPolicy","Bypass","-File","C:\\app\\main.ps1"]
