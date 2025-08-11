@@ -1,19 +1,23 @@
 ﻿version: 0.2
 env:
   variables:
-    IMAGE_REPO_NAME: "linux-app"
+    IMAGE_REPO_NAME: "linux-app" 
 phases:
   pre_build:
     commands:
-      - ACCOUNT_ID=
-      - ECR_URI=".dkr.ecr..amazonaws.com"
-      - aws ecr get-login-password | docker login --username AWS --password-stdin 
+      - echo "Login ECR"
+      - ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+      - AWS_REGION=${AWS_DEFAULT_REGION}
+      - ECR_URI="${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
+      - aws ecr get-login-password | docker login --username AWS --password-stdin ${ECR_URI}
   build:
     commands:
-      - docker build -f Dockerfile.linux -t :latest .
-      - docker tag :latest /:latest
-      - docker tag :latest /:
+      - echo "Build + Tag"
+      - docker build -f Dockerfile.linux -t ${IMAGE_REPO_NAME}:latest .
+      - docker tag ${IMAGE_REPO_NAME}:latest ${ECR_URI}/${IMAGE_REPO_NAME}:latest
+      - docker tag ${IMAGE_REPO_NAME}:latest ${ECR_URI}/${IMAGE_REPO_NAME}:${CODEBUILD_RESOLVED_SOURCE_VERSION}
   post_build:
     commands:
-      - docker push /:latest
-      - docker push /:
+      - echo "Push"
+      - docker push ${ECR_URI}/${IMAGE_REPO_NAME}:latest
+      - docker push ${ECR_URI}/${IMAGE_REPO_NAME}:${CODEBUILD_RESOLVED_SOURCE_VERSION}

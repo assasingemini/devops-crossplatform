@@ -1,1 +1,1 @@
-# Không yêu cầu thư viện ngoài
+Flask==3.0.3

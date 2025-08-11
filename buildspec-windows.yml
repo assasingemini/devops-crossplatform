@@ -2,19 +2,24 @@
 env:
   shell: powershell.exe
   variables:
-    IMAGE_REPO_NAME: "windows-app"
+    IMAGE_REPO_NAME: "windows-app"   # trùng tên repo bạn đã tạo trong ECR
 phases:
   pre_build:
     commands:
-      -  = (aws sts get-caller-identity --query Account --output text)
-      -  = ".dkr.ecr..amazonaws.com"
-      - aws ecr get-login-password | docker login --username AWS --password-stdin 
+      - Write-Host "Login ECR"
+      - $ACCOUNT_ID = (aws sts get-caller-identity --query Account --output text)
+      - $ECR_URI = "$ACCOUNT_ID.dkr.ecr.$env:AWS_DEFAULT_REGION.amazonaws.com"
+      # (tuỳ chọn) tự tạo repo nếu chưa có
+      - try { aws ecr describe-repositories --repository-names $env:IMAGE_REPO_NAME | Out-Null } catch { aws ecr create-repository --repository-name $env:IMAGE_REPO_NAME | Out-Null }
+      - aws ecr get-login-password | docker login --username AWS --password-stdin $ECR_URI
   build:
     commands:
-      - docker build -f Dockerfile.windows -t  .
-      - docker tag  "/"
-      - docker tag  "/"
+      - Write-Host "Build image"
+      - docker build -f Dockerfile.windows -t $env:IMAGE_REPO_NAME:latest .
+      - docker tag $env:IMAGE_REPO_NAME:latest "$ECR_URI/$env:IMAGE_REPO_NAME:latest"
+      - docker tag $env:IMAGE_REPO_NAME:latest "$ECR_URI/$env:IMAGE_REPO_NAME:$env:CODEBUILD_RESOLVED_SOURCE_VERSION"
   post_build:
     commands:
-      - docker push "/"
-      - docker push "/"
+      - Write-Host "Push image"
+      - docker push "$ECR_URI/$env:IMAGE_REPO_NAME:latest"
+      - docker push "$ECR_URI/$env:IMAGE_REPO_NAME:$env:CODEBUILD_RESOLVED_SOURCE_VERSION"

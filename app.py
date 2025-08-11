@@ -1,16 +1,16 @@
-import platform
-import os
+# app.py
+from flask import Flask
+import os, platform
 
-def main():
-    os_name = platform.system()
-    print(f"Xin chào! Bạn đang chạy trên hệ điều hành: {os_name}")
+app = Flask(__name__)
 
-    if os_name == "Windows":
-        print("Lệnh mẫu cho Windows: dir")
-        os.system("dir")
-    else:
-        print("Lệnh mẫu cho Linux/Mac: ls -la")
-        os.system("ls -la")
+@app.get("/")
+def hello():
+    return (
+        "Hello from Linux container!\n"
+        f"OS={platform.platform()}\n"
+        f"Commit={os.getenv('CODEBUILD_RESOLVED_SOURCE_VERSION','local')}\n"
+    ), 200, {"Content-Type": "text/plain; charset=utf-8"}
 
 if __name__ == "__main__":
-    main()
+    app.run(host="0.0.0.0", port=8080)
