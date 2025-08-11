@@ -1,25 +1,30 @@
 ﻿version: 0.2
 env:
-  shell: powershell.exe
+  shell: powershell
   variables:
-    IMAGE_REPO_NAME: "windows-app"   # trùng tên repo bạn đã tạo trong ECR
+    IMAGE_REPO_NAME: "windows-app"
+
 phases:
   pre_build:
     commands:
       - Write-Host "Login ECR"
       - $ACCOUNT_ID = (aws sts get-caller-identity --query Account --output text)
-      - $ECR_URI = "$ACCOUNT_ID.dkr.ecr.$env:AWS_DEFAULT_REGION.amazonaws.com"
-      # (tuỳ chọn) tự tạo repo nếu chưa có
-      - try { aws ecr describe-repositories --repository-names $env:IMAGE_REPO_NAME | Out-Null } catch { aws ecr create-repository --repository-name $env:IMAGE_REPO_NAME | Out-Null }
-      - aws ecr get-login-password | docker login --username AWS --password-stdin $ECR_URI
+      - $REGION = $env:AWS_DEFAULT_REGION
+      - $ECR_URI = "$ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com"
+      # tạo repo nếu chưa có (an toàn)
+      - try { aws ecr describe-repositories --repository-names $env:IMAGE_REPO_NAME --region $REGION | Out-Null } catch { aws ecr create-repository --repository-name $env:IMAGE_REPO_NAME --region $REGION | Out-Null }
+      # login: BẮT BUỘC chỉ rõ --region
+      - aws ecr get-login-password --region $REGION | docker login --username AWS --password-stdin $ECR_URI
+
   build:
     commands:
-      - Write-Host "Build image"
+      - Write-Host "Build + Tag"
       - docker build -f Dockerfile.windows -t $env:IMAGE_REPO_NAME:latest .
-      - docker tag $env:IMAGE_REPO_NAME:latest "$ECR_URI/$env:IMAGE_REPO_NAME:latest"
-      - docker tag $env:IMAGE_REPO_NAME:latest "$ECR_URI/$env:IMAGE_REPO_NAME:$env:CODEBUILD_RESOLVED_SOURCE_VERSION"
+      - docker tag $env:IMAGE_REPO_NAME:latest "$ECR_URI/$($env:IMAGE_REPO_NAME):latest"
+      - docker tag $env:IMAGE_REPO_NAME:latest "$ECR_URI/$($env:IMAGE_REPO_NAME):$env:CODEBUILD_RESOLVED_SOURCE_VERSION"
+
   post_build:
     commands:
-      - Write-Host "Push image"
-      - docker push "$ECR_URI/$env:IMAGE_REPO_NAME:latest"
-      - docker push "$ECR_URI/$env:IMAGE_REPO_NAME:$env:CODEBUILD_RESOLVED_SOURCE_VERSION"
+      - Write-Host "Push"
+      - docker push "$ECR_URI/$($env:IMAGE_REPO_NAME):latest"
+      - docker push "$ECR_URI/$($env:IMAGE_REPO_NAME):$env:CODEBUILD_RESOLVED_SOURCE_VERSION"
