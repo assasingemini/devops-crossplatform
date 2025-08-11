@@ -1,0 +1,7 @@
+﻿# escape=
+FROM mcr.microsoft.com/windows/servercore:ltsc2019
+SHELL ["powershell","-Command"]
+WORKDIR C:\app
+COPY main.ps1 C:\app\main.ps1
+EXPOSE 8080
+ENTRYPOINT ["powershell.exe","-File","C:\\app\\main.ps1"]

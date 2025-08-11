@@ -1,0 +1,20 @@
+﻿version: 0.2
+env:
+  shell: powershell.exe
+  variables:
+    IMAGE_REPO_NAME: "windows-app"
+phases:
+  pre_build:
+    commands:
+      -  = (aws sts get-caller-identity --query Account --output text)
+      -  = ".dkr.ecr..amazonaws.com"
+      - aws ecr get-login-password | docker login --username AWS --password-stdin 
+  build:
+    commands:
+      - docker build -f Dockerfile.windows -t  .
+      - docker tag  "/"
+      - docker tag  "/"
+  post_build:
+    commands:
+      - docker push "/"
+      - docker push "/"

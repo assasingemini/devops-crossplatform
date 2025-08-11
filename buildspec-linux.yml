@@ -1,0 +1,19 @@
+﻿version: 0.2
+env:
+  variables:
+    IMAGE_REPO_NAME: "linux-app"
+phases:
+  pre_build:
+    commands:
+      - ACCOUNT_ID=
+      - ECR_URI=".dkr.ecr..amazonaws.com"
+      - aws ecr get-login-password | docker login --username AWS --password-stdin 
+  build:
+    commands:
+      - docker build -f Dockerfile.linux -t :latest .
+      - docker tag :latest /:latest
+      - docker tag :latest /:
+  post_build:
+    commands:
+      - docker push /:latest
+      - docker push /:
