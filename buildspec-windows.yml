@@ -24,10 +24,20 @@ phases:
         }
       - 'Write-Host "Login ECR..."'
       - 'docker logout $ECR_URI | Out-Null'
-      - '$pw = aws ecr get-login-password --region $REGION'
-      - 'if (-not $pw) { throw "Failed to get ECR login password for region $REGION" }'
-      - '$pw | docker login --username AWS --password-stdin $ECR_URI'
-      - 'if ($LASTEXITCODE -ne 0) { throw "ECR login failed for $ECR_URI" }'
+      # Login kiểu mới (CLI v2) + scope theo registry; nếu fail thì fallback
+      - '$pw = aws ecr get-login-password --region $REGION --registry-ids $ACCOUNT_ID'
+      - 'if ($pw) { $pw | docker login --username AWS --password-stdin $ECR_URI }'
+      - 'if ($LASTEXITCODE -ne 0) {'
+      - '  Write-Host "New login method failed -> fallback to get-authorization-token"'
+      - '  $auth = aws ecr get-authorization-token --region $REGION --registry-ids $ACCOUNT_ID --output text --query "authorizationData[].authorizationToken"'
+      - '  $proxy = aws ecr get-authorization-token --region $REGION --registry-ids $ACCOUNT_ID --output text --query "authorizationData[].proxyEndpoint"'
+      - '  $proxy = $proxy -replace "^https://",""'
+      - '  $decoded = [System.Text.Encoding]::ASCII.GetString([System.Convert]::FromBase64String($auth))'
+      - '  $parts = $decoded.Split(":",2)'
+      - '  $user = $parts[0]; $pass = $parts[1]'
+      - '  $pass | docker login --username $user --password-stdin $proxy'
+      - '}'
+      - 'if ($LASTEXITCODE -ne 0) { throw "ECR login failed (both methods)" }'
 
   build:
     commands:
