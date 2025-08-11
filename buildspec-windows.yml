@@ -3,7 +3,7 @@ env:
   shell: powershell
   variables:
     IMAGE_REPO_NAME: "windows-app"
-    ECR_REGION: "ap-southeast-1"
+    ECR_REGION: "us-east-1"
 
 phases:
   pre_build:
