@@ -22,23 +22,22 @@ phases:
           aws ecr create-repository --repository-name $env:IMAGE_REPO_NAME --region $REGION | Out-Null
           if ($LASTEXITCODE -ne 0) { throw "Failed to create ECR repo $($env:IMAGE_REPO_NAME) in $REGION" }
         }
-
       - 'Write-Host "Login ECR..."'
+      - 'aws --version'
+      - 'docker version'
+      - 'Write-Host "Caller=$(aws sts get-caller-identity --query Account --output text)  Region=$REGION"'
       - 'docker logout $ECR_URI | Out-Null'
-
-      # Cách mới (CLI v2): KHÔNG có --registry-ids
+      # Login kiểu mới (CLI v2)
       - '$pw = aws ecr get-login-password --region $REGION'
       - 'if ($pw) { $pw | docker login --username AWS --password-stdin $ECR_URI }'
-
-      # Fallback nếu trên lỗi (ví dụ 400 Bad Request): dùng get-authorization-token + registry-ids
+      # Fallback nếu trên lỗi: dùng get-authorization-token (có --registry-ids)
       - 'if ($LASTEXITCODE -ne 0) {'
       - '  Write-Host "New login failed -> fallback to get-authorization-token"'
-      - '  $auth = aws ecr get-authorization-token --region $REGION --registry-ids $ACCOUNT_ID --output text --query "authorizationData[].authorizationToken"'
+      - '  $auth  = aws ecr get-authorization-token --region $REGION --registry-ids $ACCOUNT_ID --output text --query "authorizationData[].authorizationToken"'
       - '  $proxy = aws ecr get-authorization-token --region $REGION --registry-ids $ACCOUNT_ID --output text --query "authorizationData[].proxyEndpoint"'
       - '  $proxy = $proxy -replace "^https://",""'
-      - '  $decoded = [System.Text.Encoding]::ASCII.GetString([System.Convert]::FromBase64String($auth))'  # "AWS:<password>"
-      - '  $parts = $decoded.Split(":",2)'
-      - '  $user = $parts[0]; $pass = $parts[1]'
+      - '  $decoded = [System.Text.Encoding]::ASCII.GetString([System.Convert]::FromBase64String($auth))'
+      - '  $user,$pass = $decoded.Split(":",2)'
       - '  $pass | docker login --username $user --password-stdin $proxy'
       - '}'
       - 'if ($LASTEXITCODE -ne 0) { throw "ECR login failed (both methods)" }'
